@@ -30,7 +30,7 @@ A traditional deep learning approach using:
 
 | Original MRI | Grad-Cam | Tumor Segmentation |
 |:------------:|:-------------:|:------------------:|
-| ![Original](assets/original_cnn).png) | ![GradCam](assets/gradcam_cnn.png) | ![Segmentation](assets/segmentation_cnn.png) |
+| ![Original](assets/original_cnn.png) | ![GradCam](assets/gradcam_cnn.png) | ![Segmentation](assets/segmentation_cnn.png) |
 
 **Prediction:** Meningioma (97.4% confidence)
 
