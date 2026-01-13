@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brain Tumor Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-zone:hover {
+            border-color: #2563eb;
+            background: #f8fafc;
+        }
+
+        .upload-zone.dragover {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+
+        .upload-text {
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-hint {
+            font-size: 0.875rem;
+            color: #999;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .preview-image {
+            max-width: 200px;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .preview-image.active {
+            display: block;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.875rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1d4ed8;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Results */
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .diagnosis {
+            text-align: center;
+            padding: 1.5rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .diagnosis-label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .diagnosis-result {
+            font-size: 1.75rem;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+
+        .diagnosis-result.glioma { color: #dc2626; }
+        .diagnosis-result.meningioma { color: #d97706; }
+        .diagnosis-result.pituitary { color: #7c3aed; }
+        .diagnosis-result.notumor { color: #16a34a; }
+
+        .confidence {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        /* Image grid */
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .image-item {
+            text-align: center;
+        }
+
+        .image-item img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .image-item-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        /* 3D Viewer */
+        .viewer-container {
+            background: #1a1a2e;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #three-container {
+            width: 100%;
+            height: 400px;
+        }
+
+        .viewer-hint {
+            position: absolute;
+            bottom: 0.75rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+
+        .no-tumor {
+            text-align: center;
+            padding: 2rem;
+            background: #ecfdf5;
+            border-radius: 8px;
+            color: #16a34a;
+        }
+
+        .no-tumor-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #eee;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tumor metrics */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2563eb;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        /* Divider */
+        .divider {
+            text-align: center;
+            color: #999;
+            margin: 1rem 0;
+            font-size: 0.875rem;
+        }
+
+        .btn-random {
+            width: 100%;
+            padding: 0.875rem;
+            font-size: 1rem;
+            font-weight: 500;
+            background: #f8fafc;
+            color: #475569;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-random:hover {
+            background: #f1f5f9;
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+
+        /* URL Input */
+        .url-input-container {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .divider-inline {
+            font-size: 0.8rem;
+            color: #999;
+            margin-bottom: 0.5rem;
+        }
+
+        .url-input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.9rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .url-input:focus {
+            border-color: #2563eb;
+        }
+
+        .btn-load-url {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-load-url:hover {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container">
+        <h1 style="text-align: center;">Brain Tumor Detection</h1>
+
+        <div class="card">
+            <div class="card-title">Upload MRI Scan</div>
+            <div class="upload-zone" id="upload-zone">
+                <div class="upload-text">Click or drag image here</div>
+                <div class="upload-hint">Supports JPG, PNG</div>
+            </div>
+            <input type="file" id="file-input" accept="image/*">
+            
+            <div class="url-input-container">
+                <div class="divider-inline">or paste image URL</div>
+                <div class="url-input-row">
+                    <input type="text" id="url-input" class="url-input" placeholder="https://example.com/image.jpg" onkeypress="if(event.key==='Enter')loadFromUrl()">
+                    <button class="btn-load-url" id="load-url-btn" onclick="loadFromUrl()">Load</button>
+                </div>
+            </div>
+            
+            <img class="preview-image" id="preview-image" alt="Preview">
+            <button class="btn btn-primary" id="analyze-btn" disabled>Analyze</button>
+        </div>
+
+        <div class="divider">or</div>
+        <button class="btn btn-random" id="random-btn" onclick="loadRandom()">🎲 Random Sample</button>
+
+        <div class="results" id="results">
+            <div class="card">
+                <div class="diagnosis">
+                    <div class="diagnosis-label">Result</div>
+                    <div class="diagnosis-result" id="diagnosis-result">—</div>
+                    <div class="confidence" id="confidence">—</div>
+                </div>
+
+                <div class="image-grid">
+                    <div class="image-item">
+                        <img id="img-original" alt="Original">
+                        <div class="image-item-label">Original</div>
+                    </div>
+                    <div class="image-item">
+                        <img id="img-attention" alt="Attention">
+                        <div class="image-item-label">Attention Map</div>
+                    </div>
+                    <div class="image-item">
+                        <img id="img-segmentation" alt="Segmentation">
+                        <div class="image-item-label">Segmentation</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="tumor-section">
+                <div class="card-title">3D Tumor View</div>
+                <div class="viewer-container">
+                    <div id="three-container"></div>
+                    <div class="viewer-hint">Drag to rotate • Scroll to zoom</div>
+                </div>
+                <div class="metrics" id="metrics"></div>
+            </div>
+
+            <div class="card no-tumor" id="no-tumor" style="display: none;">
+                <div class="no-tumor-icon">✓</div>
+                <div>No tumor detected</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let scene, camera, renderer, controls, tumorMesh;
+
+        // DOM
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const previewImage = document.getElementById('preview-image');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+
+        // Upload handlers
+        uploadZone.onclick = () => fileInput.click();
+        
+        uploadZone.ondragover = (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        };
+        
+        uploadZone.ondragleave = () => uploadZone.classList.remove('dragover');
+        
+        uploadZone.ondrop = (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        };
+        
+        fileInput.onchange = (e) => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        };
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) return;
+            currentFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewImage.classList.add('active');
+                analyzeBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Analyze
+        analyzeBtn.onclick = async () => {
+            if (!currentFile) return;
+            
+            loading.classList.add('active');
+            analyzeBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', currentFile);
+
+            try {
+                const res = await fetch('/predict', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) showResults(data);
+                else alert('Error: ' + (data.detail || 'Unknown'));
+            } catch (e) {
+                alert('Connection error');
+            } finally {
+                loading.classList.remove('active');
+                analyzeBtn.disabled = false;
+            }
+        };
+
+        function showResults(data) {
+            results.classList.add('active');
+
+            // Diagnosis
+            const diagResult = document.getElementById('diagnosis-result');
+            diagResult.textContent = data.prediction.replace('_', ' ');
+            diagResult.className = 'diagnosis-result ' + data.prediction;
+            document.getElementById('confidence').textContent = `Confidence: ${data.confidence}%`;
+
+            // Images
+            document.getElementById('img-original').src = data.images.original;
+            document.getElementById('img-attention').src = data.images.attention;
+            document.getElementById('img-segmentation').src = data.images.segmentation;
+
+            // Tumor section
+            const tumorSection = document.getElementById('tumor-section');
+            const noTumor = document.getElementById('no-tumor');
+
+            if (data.has_tumor) {
+                tumorSection.style.display = 'block';
+                noTumor.style.display = 'none';
+                
+                // 3D
+                if (!scene) initThree();
+                createTumorMesh(data.volume_data);
+
+                // Metrics
+                if (data.tumor_metrics) {
+                    document.getElementById('metrics').innerHTML = `
+                        <div class="metric">
+                            <div class="metric-value">${data.tumor_metrics.area_pixels.toLocaleString()}</div>
+                            <div class="metric-label">Area (px)</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${data.tumor_metrics.percentage}%</div>
+                            <div class="metric-label">Coverage</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${Math.round(data.tumor_metrics.centroid[0])}, ${Math.round(data.tumor_metrics.centroid[1])}</div>
+                            <div class="metric-label">Center</div>
+                        </div>
+                    `;
+                }
+            } else {
+                tumorSection.style.display = 'none';
+                noTumor.style.display = 'block';
+            }
+
+            results.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Three.js
+        let brainGroup = null;
+
+        function initThree() {
+            const container = document.getElementById('three-container');
+            const w = container.clientWidth, h = container.clientHeight;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a1a);
+
+            camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 1000);
+            camera.position.set(0, 30, 150);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(w, h);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+            
+            const light1 = new THREE.DirectionalLight(0xffffff, 0.6);
+            light1.position.set(50, 50, 50);
+            scene.add(light1);
+            
+            const light2 = new THREE.DirectionalLight(0x8888ff, 0.3);
+            light2.position.set(-50, -50, 50);
+            scene.add(light2);
+
+            // Create brain model
+            createBrainModel();
+
+            animate();
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth, h = container.clientHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            });
+        }
+
+        function createBrainModel() {
+            brainGroup = new THREE.Group();
+
+            // Use only wireframe for skull so tumor is clearly visible
+            const skullWireMaterial = new THREE.MeshBasicMaterial({
+                color: 0xd4c4b0,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.4
+            });
+
+            // Cranium wireframe only
+            const cranium = new THREE.Mesh(
+                new THREE.SphereGeometry(42, 24, 24),
+                skullWireMaterial
+            );
+            cranium.scale.set(1, 0.9, 1.15);
+            cranium.position.y = 5;
+            brainGroup.add(cranium);
+
+            // Forehead
+            const forehead = new THREE.Mesh(
+                new THREE.SphereGeometry(28, 16, 16),
+                skullWireMaterial
+            );
+            forehead.scale.set(1.1, 0.7, 0.5);
+            forehead.position.set(0, 15, 32);
+            brainGroup.add(forehead);
+
+            // Temples
+            const leftTemple = new THREE.Mesh(
+                new THREE.SphereGeometry(18, 12, 12),
+                skullWireMaterial
+            );
+            leftTemple.scale.set(0.35, 0.75, 0.8);
+            leftTemple.position.set(-36, -5, 8);
+            brainGroup.add(leftTemple);
+
+            const rightTemple = new THREE.Mesh(
+                new THREE.SphereGeometry(18, 12, 12),
+                skullWireMaterial
+            );
+            rightTemple.scale.set(0.35, 0.75, 0.8);
+            rightTemple.position.set(36, -5, 8);
+            brainGroup.add(rightTemple);
+
+            // Back of skull
+            const occipital = new THREE.Mesh(
+                new THREE.SphereGeometry(30, 16, 16),
+                skullWireMaterial
+            );
+            occipital.scale.set(1, 0.8, 0.6);
+            occipital.position.set(0, -5, -32);
+            brainGroup.add(occipital);
+
+            // Jaw outline
+            const jaw = new THREE.Mesh(
+                new THREE.TorusGeometry(20, 3, 8, 16, Math.PI),
+                skullWireMaterial
+            );
+            jaw.position.set(0, -30, 18);
+            jaw.rotation.x = Math.PI / 2;
+            brainGroup.add(jaw);
+
+            // Eye sockets - just rings
+            const eyeRingMaterial = new THREE.MeshBasicMaterial({
+                color: 0x888888,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.5
+            });
+
+            const leftEye = new THREE.Mesh(
+                new THREE.TorusGeometry(8, 1.5, 8, 16),
+                eyeRingMaterial
+            );
+            leftEye.position.set(-14, -6, 38);
+            brainGroup.add(leftEye);
+
+            const rightEye = new THREE.Mesh(
+                new THREE.TorusGeometry(8, 1.5, 8, 16),
+                eyeRingMaterial
+            );
+            rightEye.position.set(14, -6, 38);
+            brainGroup.add(rightEye);
+
+            // Nose triangle
+            const noseGeom = new THREE.BufferGeometry();
+            const noseVerts = new Float32Array([
+                0, -12, 40,   // top
+                -5, -25, 38,  // bottom left
+                5, -25, 38    // bottom right
+            ]);
+            noseGeom.setAttribute('position', new THREE.BufferAttribute(noseVerts, 3));
+            const nose = new THREE.Line(noseGeom, new THREE.LineBasicMaterial({ color: 0x888888 }));
+            brainGroup.add(nose);
+
+            // Brain surface (faint, inside skull)
+            const brainMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffaaaa,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.1
+            });
+
+            const brain = new THREE.Mesh(
+                new THREE.SphereGeometry(32, 16, 16),
+                brainMaterial
+            );
+            brain.scale.set(1, 0.85, 1.1);
+            brain.position.y = 5;
+            brainGroup.add(brain);
+
+            // Set render order so skull renders first
+            brainGroup.renderOrder = 0;
+
+            scene.add(brainGroup);
+        }
+
+        function createTumorMesh(volumeData) {
+            if (tumorMesh) {
+                scene.remove(tumorMesh);
+                tumorMesh.geometry.dispose();
+                tumorMesh.material.dispose();
+            }
+
+            const slices = volumeData.length;
+            const height = volumeData[0].length;
+            const width = volumeData[0][0].length;
+
+            const positions = [], colors = [];
+            const color = new THREE.Color();
+            const scale = 55 / Math.max(width, height, slices);
+            const ox = -width * scale / 2, oy = -height * scale / 2, oz = -slices * scale / 2;
+
+            for (let z = 0; z < slices; z++) {
+                for (let y = 0; y < height; y += 2) {
+                    for (let x = 0; x < width; x += 2) {
+                        const v = volumeData[z][y][x];
+                        if (v > 0.08) {
+                            positions.push(x * scale + ox, y * scale + oy, z * scale + oz);
+                            // Bright red/orange for tumor - very visible
+                            color.setHSL(0.0, 1.0, 0.5 + v * 0.3);
+                            colors.push(color.r, color.g, color.b);
+                        }
+                    }
+                }
+            }
+
+            if (positions.length === 0) {
+                console.log('No tumor points to display');
+                return;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            tumorMesh = new THREE.Points(geometry, new THREE.PointsMaterial({
+                size: 4,
+                vertexColors: true,
+                transparent: false,
+                depthTest: true,
+                depthWrite: true,
+                sizeAttenuation: true
+            }));
+            
+            // Position tumor inside brain area
+            tumorMesh.position.set(0, 5, 0);
+            
+            // Render tumor on top of skull wireframe
+            tumorMesh.renderOrder = 1;
+            
+            scene.add(tumorMesh);
+            console.log('Tumor mesh created with', positions.length / 3, 'points');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            
+            // Rotate brain and tumor together
+            if (brainGroup) brainGroup.rotation.y += 0.002;
+            if (tumorMesh) tumorMesh.rotation.y += 0.002;
+            
+            renderer.render(scene, camera);
+        }
+
+        // Load from URL
+        async function loadFromUrl() {
+            const urlInput = document.getElementById('url-input');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                alert('Please enter an image URL');
+                return;
+            }
+            
+            loading.classList.add('active');
+            
+            try {
+                // Try to load via our proxy endpoint
+                const res = await fetch('/load-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok || !data.image) {
+                    throw new Error(data.detail || 'Failed to load image from URL');
+                }
+                
+                // Convert to file
+                const response = await fetch(data.image);
+                const blob = await response.blob();
+                currentFile = new File([blob], 'url-image.jpg', { type: 'image/jpeg' });
+                
+                previewImage.src = data.image;
+                previewImage.classList.add('active');
+                analyzeBtn.disabled = false;
+                
+                loading.classList.remove('active');
+                
+                // Auto analyze
+                analyzeBtn.click();
+            } catch (e) {
+                loading.classList.remove('active');
+                alert('Error: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        // Load random sample
+        async function loadRandom() {
+            loading.classList.add('active');
+            
+            try {
+                const res = await fetch('/random-sample');
+                const data = await res.json();
+                
+                if (!res.ok || !data.image) {
+                    throw new Error(data.detail || 'Failed to load sample');
+                }
+                
+                // Convert base64 to file
+                const response = await fetch(data.image);
+                const blob = await response.blob();
+                currentFile = new File([blob], data.filename || 'sample.jpg', { type: 'image/jpeg' });
+                
+                previewImage.src = data.image;
+                previewImage.classList.add('active');
+                analyzeBtn.disabled = false;
+                
+                // Auto analyze
+                loading.classList.remove('active');
+                analyzeBtn.click();
+            } catch (e) {
+                loading.classList.remove('active');
+                alert('Error: ' + e.message);
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>
