@@ -77,5 +77,5 @@ Trained on the [Brain Tumor MRI Dataset](https://www.kaggle.com/datasets/masoudn
 
 ## Acknowledgments
 
-- Dataset by [Masoud Nickparvar](https://www.kaggle.com/masoudnickparvar)
+- [ Dataset]([https://www.kaggle.com/masoudnickparvar](https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset))
 - Vision Transformer architecture by [Google Research](https://arxiv.org/abs/2010.11929)
